@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAGOGRADE AI — Klasifikasi Mutu Ampas Sagu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #1B1812;
+    --bg-panel: #23201A;
+    --bg-panel-raised: #2B2721;
+    --line: #3A342A;
+    --paper: #F3ECDD;
+    --paper-dim: #C9BFA9;
+    --muted: #948A76;
+
+    /* spektrum grade — meniru warna asli ampas sagu dari cerah (A) ke gelap (D) */
+    --grade-a: #E4C468;
+    --grade-a-deep: #B99A3E;
+    --grade-b: #C89456;
+    --grade-c: #8A6440;
+    --grade-d: #4A3B2A;
+
+    --moss: #7C8863;
+    --danger: #B5583F;
+    --radius: 14px;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(228,196,104,0.10), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(124,136,99,0.08), transparent 55%),
+      var(--bg);
+    color:var(--paper);
+    font-family:'Work Sans', sans-serif;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{ font-family:'Fraunces', serif; font-weight:600; letter-spacing:-0.01em; color:var(--paper);}
+  .mono{ font-family:'JetBrains Mono', monospace; }
+  a{ color:var(--grade-a); }
+  img,svg{ display:block; max-width:100%; }
+  :focus-visible{ outline:2px solid var(--grade-a); outline-offset:3px; }
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:0.001ms !important; transition-duration:0.001ms !important; }
+  }
+
+  .wrap{ max-width:1100px; margin:0 auto; padding:0 24px; }
+
+  /* ---------- spektrum bar — elemen tanda tangan ---------- */
+  .spectrum{
+    height:6px; width:100%;
+    background:linear-gradient(90deg, var(--grade-a) 0%, var(--grade-b) 34%, var(--grade-c) 66%, var(--grade-d) 100%);
+  }
+
+  /* ---------- header ---------- */
+  header{ padding:22px 0 10px; border-bottom:1px solid var(--line); }
+  .headerbar{ display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand-mark{
+    width:38px; height:38px; border-radius:9px;
+    background:conic-gradient(from 210deg, var(--grade-a), var(--grade-b), var(--grade-c), var(--grade-d));
+    flex-shrink:0;
+  }
+  .brand-name{ font-family:'Fraunces', serif; font-weight:700; font-size:1.15rem; letter-spacing:0.02em; }
+  .brand-sub{ font-size:0.78rem; color:var(--muted); font-family:'JetBrains Mono', monospace; }
+  .badges{ display:flex; gap:8px; flex-wrap:wrap; }
+  .badge{
+    font-size:0.72rem; font-family:'JetBrains Mono', monospace; color:var(--paper-dim);
+    border:1px solid var(--line); border-radius:999px; padding:5px 11px; white-space:nowrap;
+  }
+
+  /* ---------- hero ---------- */
+  .hero{ padding:56px 0 40px; }
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace; font-size:0.75rem; color:var(--moss);
+    text-transform:uppercase; letter-spacing:0.12em; margin:0 0 14px;
+  }
+  .hero h1{ font-size:clamp(2rem, 4.2vw, 3.1rem); line-height:1.08; margin:0 0 18px; max-width:16ch; }
+  .hero p.lede{ color:var(--paper-dim); font-size:1.05rem; max-width:58ch; margin:0 0 6px; }
+  .hero .team{ color:var(--muted); font-size:0.85rem; margin-top:14px; }
+
+  /* ---------- demo / alat utama ---------- */
+  .demo{
+    background:var(--bg-panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:28px; margin-top:34px;
+  }
+  .demo-grid{ display:grid; grid-template-columns:1.1fr 1fr; gap:28px; }
+  @media (max-width:820px){ .demo-grid{ grid-template-columns:1fr; } }
+
+  .stage{
+    position:relative; aspect-ratio:4/3; border-radius:10px; overflow:hidden;
+    background:
+      repeating-linear-gradient(45deg, #211D16, #211D16 10px, #262119 10px, #262119 20px);
+    border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .stage video, .stage img.preview{
+    width:100%; height:100%; object-fit:cover; position:absolute; inset:0;
+  }
+  .stage-empty{ color:var(--muted); text-align:center; padding:20px; font-size:0.9rem; z-index:1; position:relative; }
+  .stage-empty svg{ margin:0 auto 10px; opacity:0.6; }
+
+  .controls{ display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+  button{ font-family:'Work Sans', sans-serif; cursor:pointer; border-radius:9px; border:1px solid transparent; }
+  .btn-primary{
+    background:var(--grade-a); color:#20190A; font-weight:600; font-size:0.92rem;
+    padding:11px 18px; border:none;
+  }
+  .btn-primary:hover{ background:var(--grade-a-deep); }
+  .btn-primary:disabled{ opacity:0.4; cursor:not-allowed; }
+  .btn-ghost{
+    background:transparent; color:var(--paper); border:1px solid var(--line);
+    font-size:0.92rem; padding:11px 16px;
+  }
+  .btn-ghost:hover{ border-color:var(--paper-dim); }
+  input[type="file"]{ display:none; }
+
+  .panel-label{ font-family:'JetBrains Mono', monospace; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); margin:0 0 12px; }
+
+  /* ---------- hasil klasifikasi ---------- */
+  .results{ display:flex; flex-direction:column; gap:10px; min-height:1px; }
+  .result-row{ display:grid; grid-template-columns:78px 1fr 48px; align-items:center; gap:12px; }
+  .result-label{ font-family:'JetBrains Mono', monospace; font-size:0.82rem; color:var(--paper-dim); }
+  .bar-track{ height:10px; background:#1A1710; border-radius:999px; overflow:hidden; border:1px solid var(--line); }
+  .bar-fill{ height:100%; border-radius:999px; width:0%; transition:width 0.5s ease; }
+  .result-pct{ font-family:'JetBrains Mono', monospace; font-size:0.82rem; text-align:right; color:var(--paper-dim); }
+
+  .verdict{
+    margin-top:18px; padding:16px; border-radius:10px; border:1px solid var(--line);
+    background:var(--bg-panel-raised); display:none;
+  }
+  .verdict.show{ display:block; }
+  .verdict-grade{ font-family:'Fraunces', serif; font-weight:700; font-size:1.3rem; margin:0 0 4px; }
+  .verdict-char{ color:var(--paper-dim); font-size:0.88rem; margin:0 0 10px; }
+  .verdict-rec{ font-size:0.92rem; }
+  .verdict-rec b{ color:var(--paper); }
+
+  .status-line{ font-family:'JetBrains Mono', monospace; font-size:0.78rem; color:var(--muted); margin-top:12px; min-height:1.2em; }
+
+  /* ---------- konfigurasi model ---------- */
+  .modelbox{
+    margin-top:16px; padding-top:16px; border-top:1px dashed var(--line);
+  }
+  .modelbox input[type="text"]{
+    width:100%; background:#1A1710; border:1px solid var(--line); color:var(--paper);
+    border-radius:8px; padding:10px 12px; font-family:'JetBrains Mono', monospace; font-size:0.82rem;
+    margin-bottom:10px;
+  }
+  .modelbox p{ font-size:0.8rem; color:var(--muted); margin:8px 0 0; }
+
+  /* ---------- section umum ---------- */
+  section.block{ padding:56px 0; border-top:1px solid var(--line); }
+  .block h2{ font-size:1.7rem; margin:0 0 8px; }
+  .block .sub{ color:var(--muted); font-size:0.92rem; margin:0 0 28px; max-width:60ch; }
+
+  /* ---------- tabel grade (referensi tabel 4.1 LKTI) ---------- */
+  .grade-list{ display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; }
+  @media (max-width:820px){ .grade-list{ grid-template-columns:1fr 1fr; } }
+  @media (max-width:520px){ .grade-list{ grid-template-columns:1fr; } }
+  .grade-card{
+    border-radius:12px; padding:18px; border:1px solid var(--line); background:var(--bg-panel);
+    position:relative; overflow:hidden;
+  }
+  .grade-card::before{
+    content:""; position:absolute; top:0; left:0; right:0; height:5px;
+  }
+  .grade-card[data-g="A"]::before{ background:var(--grade-a); }
+  .grade-card[data-g="B"]::before{ background:var(--grade-b); }
+  .grade-card[data-g="C"]::before{ background:var(--grade-c); }
+  .grade-card[data-g="D"]::before{ background:var(--grade-d); }
+  .grade-card .g-letter{ font-family:'Fraunces', serif; font-weight:700; font-size:1.6rem; margin:6px 0 8px; }
+  .grade-card .g-char{ font-size:0.85rem; color:var(--paper-dim); margin:0 0 12px; min-height:64px; }
+  .grade-card .g-rec-label{ font-family:'JetBrains Mono', monospace; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); margin:0 0 5px; }
+  .grade-card .g-rec{ font-size:0.86rem; }
+
+  /* ---------- alur kerja ---------- */
+  .flow{ display:grid; grid-template-columns:repeat(4,1fr); gap:0; align-items:stretch; }
+  @media (max-width:820px){ .flow{ grid-template-columns:1fr; } }
+  .flow-step{ padding:18px 18px 18px 0; position:relative; }
+  .flow-step:not(:last-child)::after{
+    content:"→"; position:absolute; right:-2px; top:18px; color:var(--muted);
+  }
+  @media (max-width:820px){ .flow-step:not(:last-child)::after{ content:"↓"; right:auto; left:0; top:auto; bottom:-2px; } }
+  .flow-num{ font-family:'JetBrains Mono', monospace; color:var(--grade-a); font-size:0.78rem; }
+  .flow-step h3{ font-size:1rem; margin:8px 0 6px; }
+  .flow-step p{ font-size:0.85rem; color:var(--paper-dim); margin:0; }
+
+  /* ---------- kontribusi ---------- */
+  .contrib{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  @media (max-width:820px){ .contrib{ grid-template-columns:1fr; } }
+  .contrib-card{ background:var(--bg-panel); border:1px solid var(--line); border-radius:12px; padding:18px; }
+  .contrib-card h3{ font-size:0.98rem; margin:0 0 8px; color:var(--moss); }
+  .contrib-card p{ font-size:0.85rem; color:var(--paper-dim); margin:0; }
+
+  footer{ padding:36px 0 48px; border-top:1px solid var(--line); }
+  .foot-grid{ display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap; font-size:0.82rem; color:var(--muted); }
+  .foot-grid b{ color:var(--paper-dim); }
+</style>
+</head>
+<body>
+
+<div class="spectrum"></div>
+
+<header>
+  <div class="wrap headerbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"></div>
+      <div>
+        <div class="brand-name">SAGOGRADE AI</div>
+        <div class="brand-sub">klasifikasi mutu ampas sagu · real-time</div>
+      </div>
+    </div>
+    <div class="badges">
+      <span class="badge">LKTI FLMPI Nasional</span>
+      <span class="badge">SDG 12 &amp; 15</span>
+      <span class="badge">MAN IC Kota Kendari</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <p class="eyebrow">Sistem pendukung keputusan untuk pengrajin sagu</p>
+      <h1>Foto ampas sagunya, sistem yang tentukan gradenya.</h1>
+      <p class="lede">Arahkan kamera atau unggah foto ampas sagu — model computer vision berbasis MobileNet (dilatih lewat Google Teachable Machine, berjalan penuh di browser lewat TensorFlow.js) akan mengenali Grade A–D dan langsung memberi rekomendasi jalur pemanfaatannya.</p>
+      <p class="team mono">Disusun oleh Azizah Khairinniswa Sjamsu · Faizah Nurul Azizah · Prabarana Zayyan Abhinaya R</p>
+
+      <div class="demo">
+        <p class="panel-label">Alat klasifikasi</p>
+        <div class="demo-grid">
+          <div>
+            <div class="stage" id="stage">
+              <div class="stage-empty" id="stageEmpty">
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7l1.5-3h5L16 7"/><circle cx="12" cy="13.5" r="3.4"/></svg>
+                Belum ada citra.<br>Nyalakan kamera atau unggah foto ampas sagu.
+              </div>
+              <video id="webcam" autoplay muted playsinline style="display:none;"></video>
+              <img id="preview" class="preview" style="display:none;" alt="Pratinjau citra ampas sagu">
+            </div>
+            <div class="controls">
+              <button class="btn-primary" id="btnCamera">Nyalakan kamera</button>
+              <button class="btn-ghost" id="btnUpload">Unggah foto</button>
+              <button class="btn-ghost" id="btnCapture" style="display:none;">Ambil &amp; klasifikasi</button>
+              <input type="file" id="fileInput" accept="image/*">
+            </div>
+            <p class="status-line" id="statusLine">Memuat model…</p>
+          </div>
+
+          <div>
+            <p class="panel-label">Hasil klasifikasi</p>
+            <div class="results" id="results">
+              <div class="result-row"><span class="result-label">Grade A</span><div class="bar-track"><div class="bar-fill" style="background:var(--grade-a);"></div></div><span class="result-pct">—</span></div>
+              <div class="result-row"><span class="result-label">Grade B</span><div class="bar-track"><div class="bar-fill" style="background:var(--grade-b);"></div></div><span class="result-pct">—</span></div>
+              <div class="result-row"><span class="result-label">Grade C</span><div class="bar-track"><div class="bar-fill" style="background:var(--grade-c);"></div></div><span class="result-pct">—</span></div>
+              <div class="result-row"><span class="result-label">Grade D</span><div class="bar-track"><div class="bar-fill" style="background:var(--grade-d);"></div></div><span class="result-pct">—</span></div>
+            </div>
+
+            <div class="verdict" id="verdict">
+              <p class="verdict-grade" id="verdictGrade">—</p>
+              <p class="verdict-char" id="verdictChar">—</p>
+              <p class="verdict-rec" id="verdictRec">—</p>
+            </div>
+
+            <div class="modelbox">
+              <p class="panel-label" style="margin-bottom:8px;">Model Teachable Machine</p>
+              <input type="text" id="modelUrl" placeholder="Tempel link model, mis. https://teachablemachine.withgoogle.com/models/XXXXXXXX/">
+              <button class="btn-ghost" id="btnLoadModel">Muat model</button>
+              <p>Latih model 4 kelas (Grade A–D) di <a href="https://teachablemachine.withgoogle.com/train/image" target="_blank" rel="noopener">teachablemachine.withgoogle.com</a>, lalu tempel tautan "Share" model di sini. Sebelum model dimuat, demo berjalan dengan model contoh.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="grade">
+    <div class="wrap">
+      <h2>Klasifikasi grade &amp; rekomendasi pemanfaatan</h2>
+      <p class="sub">Empat kategori mutu ampas sagu beserta arah hilirisasi produk turunannya, sesuai rancangan sistem SAGOGRADE AI.</p>
+      <div class="grade-list">
+        <div class="grade-card" data-g="A">
+          <p class="g-letter">Grade A</p>
+          <p class="g-char">Tekstur halus, kadar air rendah, warna cerah dan seragam.</p>
+          <p class="g-rec-label">Rekomendasi</p>
+          <p class="g-rec">Isolasi selulosa untuk selulosa mikrokristalin (MCC), bahan pangan fungsional.</p>
+        </div>
+        <div class="grade-card" data-g="B">
+          <p class="g-letter">Grade B</p>
+          <p class="g-char">Tekstur cukup halus, kadar air kurang.</p>
+          <p class="g-rec-label">Rekomendasi</p>
+          <p class="g-rec">Bahan campuran untuk pakan ternak.</p>
+        </div>
+        <div class="grade-card" data-g="C">
+          <p class="g-letter">Grade C</p>
+          <p class="g-char">Tekstur kasar, warna kurang seragam.</p>
+          <p class="g-rec-label">Rekomendasi</p>
+          <p class="g-rec">Bahan baku biochar dan briket melalui proses pirolisis.</p>
+        </div>
+        <div class="grade-card" data-g="D">
+          <p class="g-letter">Grade D</p>
+          <p class="g-char">Kadar air tinggi, tekstur kasar dan lembap.</p>
+          <p class="g-rec-label">Rekomendasi</p>
+          <p class="g-rec">Bahan baku biogas melalui fermentasi anaerobik.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="alur">
+    <div class="wrap">
+      <h2>Alur kerja sistem</h2>
+      <p class="sub">Seluruh proses inferensi berjalan langsung di browser pengguna — tidak ada citra yang dikirim ke server eksternal.</p>
+      <div class="flow">
+        <div class="flow-step">
+          <p class="flow-num">01</p>
+          <h3>Ambil citra</h3>
+          <p>Pengguna membuka website, lalu menangkap citra ampas sagu lewat kamera atau mengunggah foto yang sudah diambil.</p>
+        </div>
+        <div class="flow-step">
+          <p class="flow-num">02</p>
+          <h3>Inferensi di browser</h3>
+          <p>Citra diproses model MobileNet hasil transfer learning di Google Teachable Machine, diekspor ke TensorFlow.js.</p>
+        </div>
+        <div class="flow-step">
+          <p class="flow-num">03</p>
+          <h3>Grade terdeteksi</h3>
+          <p>Sistem menampilkan grade (A–D) beserta persentase keyakinan untuk tiap kelas.</p>
+        </div>
+        <div class="flow-step">
+          <p class="flow-num">04</p>
+          <h3>Rekomendasi</h3>
+          <p>Jalur pemanfaatan yang sesuai ditampilkan otomatis berdasarkan grade yang terdeteksi.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="kontribusi">
+    <div class="wrap">
+      <h2>Potensi kontribusi hilirisasi berkelanjutan</h2>
+      <p class="sub">SAGOGRADE AI diarahkan untuk mendukung ekonomi sirkuler limbah sagu di tingkat pengrajin skala kecil.</p>
+      <div class="contrib">
+        <div class="contrib-card">
+          <h3>Ekonomi sirkuler</h3>
+          <p>Mengarahkan ampas sagu ke jalur pemanfaatan optimal sesuai grade, mengurangi limbah yang terbuang percuma.</p>
+        </div>
+        <div class="contrib-card">
+          <h3>Objektif &amp; cepat</h3>
+          <p>Menggantikan penilaian visual manual dengan keputusan berbasis data yang konsisten, tanpa uji laboratorium.</p>
+        </div>
+        <div class="contrib-card">
+          <h3>Berpihak pada UMKM</h3>
+          <p>Cukup lewat browser dan kamera perangkat apa pun — mendukung SDG 12 (konsumsi &amp; produksi bertanggung jawab) dan SDG 15 (ekosistem darat).</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot-grid">
+    <span><b>SAGOGRADE AI</b> — LKTI FLMPI Nasional 2026</span>
+    <span>MAN Insan Cendekia Kota Kendari, Sulawesi Tenggara</span>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+<script>
+(function(){
+  // ---- data rujukan grade (Tabel 4.1 LKTI) ----
+  const GRADE_INFO = {
+    A: { char: "Tekstur halus, kadar air rendah, warna cerah dan seragam.", rec: "Isolasi selulosa untuk selulosa mikrokristalin (MCC), bahan pangan fungsional.", color: "var(--grade-a)" },
+    B: { char: "Tekstur cukup halus, kadar air kurang.", rec: "Bahan campuran untuk pakan ternak.", color: "var(--grade-b)" },
+    C: { char: "Tekstur kasar, warna kurang seragam.", rec: "Bahan baku biochar dan briket melalui proses pirolisis.", color: "var(--grade-c)" },
+    D: { char: "Kadar air tinggi, tekstur kasar dan lembap.", rec: "Bahan baku biogas melalui fermentasi anaerobik.", color: "var(--grade-d)" }
+  };
+
+  // Ganti dengan link model Teachable Machine kalian sendiri setelah proses training,
+  // atau tempel lewat kolom "Model Teachable Machine" di halaman.
+  const DEFAULT_MODEL_URL = "";
+
+  let model, webcam, maxPredictions;
+  let usingWebcam = false;
+  let loopId = null;
+
+  const stageEmpty = document.getElementById('stageEmpty');
+  const webcamEl = document.getElementById('webcam');
+  const previewEl = document.getElementById('preview');
+  const btnCamera = document.getElementById('btnCamera');
+  const btnUpload = document.getElementById('btnUpload');
+  const btnCapture = document.getElementById('btnCapture');
+  const fileInput = document.getElementById('fileInput');
+  const statusLine = document.getElementById('statusLine');
+  const resultsEl = document.getElementById('results');
+  const verdictEl = document.getElementById('verdict');
+  const verdictGrade = document.getElementById('verdictGrade');
+  const verdictChar = document.getElementById('verdictChar');
+  const verdictRec = document.getElementById('verdictRec');
+  const modelUrlInput = document.getElementById('modelUrl');
+  const btnLoadModel = document.getElementById('btnLoadModel');
+
+  function setStatus(msg){ statusLine.textContent = msg; }
+
+  function extractGradeLetter(className){
+    const m = className.toUpperCase().match(/\b([ABCD])\b/);
+    return m ? m[1] : null;
+  }
+
+  async function loadModel(baseUrl){
+    try{
+      setStatus('Memuat model…');
+      if(!baseUrl){
+        setStatus('Belum ada model dimuat — tempel link Teachable Machine di kolom bawah untuk mengaktifkan klasifikasi.');
+        return;
+      }
+      const modelURL = baseUrl.replace(/\/?$/, '/') + 'model.json';
+      const metadataURL = baseUrl.replace(/\/?$/, '/') + 'metadata.json';
+      model = await tmImage.load(modelURL, metadataURL);
+      maxPredictions = model.getTotalClasses();
+      setStatus('Model siap. Nyalakan kamera atau unggah foto.');
+    }catch(err){
+      console.error(err);
+      setStatus('Gagal memuat model dari link tersebut. Periksa kembali link "Share" Teachable Machine.');
+    }
+  }
+
+  async function startCamera(){
+    try{
+      webcam = new tmImage.Webcam(360, 270, true);
+      await webcam.setup();
+      await webcam.play();
+      usingWebcam = true;
+      stageEmpty.style.display = 'none';
+      previewEl.style.display = 'none';
+      webcamEl.style.display = 'none';
+      document.getElementById('stage').replaceChild ? null : null;
+      // ganti elemen video bawaan tmImage ke dalam stage
+      webcam.canvas.style.width = '100%';
+      webcam.canvas.style.height = '100%';
+      webcam.canvas.style.objectFit = 'cover';
+      webcam.canvas.style.position = 'absolute';
+      webcam.canvas.style.inset = '0';
+      document.getElementById('stage').appendChild(webcam.canvas);
+      btnCapture.style.display = 'inline-block';
+      btnCamera.textContent = 'Matikan kamera';
+      setStatus('Kamera aktif — arahkan ke ampas sagu, lalu tekan "Ambil & klasifikasi".');
+      loop();
+    }catch(err){
+      console.error(err);
+      setStatus('Tidak bisa mengakses kamera. Coba unggah foto sebagai alternatif.');
+    }
+  }
+
+  function stopCamera(){
+    if(webcam){ webcam.stop(); webcam.canvas.remove(); }
+    usingWebcam = false;
+    if(loopId) cancelAnimationFrame(loopId);
+    btnCapture.style.display = 'none';
+    btnCamera.textContent = 'Nyalakan kamera';
+    stageEmpty.style.display = 'flex';
+  }
+
+  function loop(){
+    if(!usingWebcam) return;
+    webcam.update();
+    loopId = requestAnimationFrame(loop);
+  }
+
+  btnCamera.addEventListener('click', () => {
+    if(usingWebcam){ stopCamera(); } else { startCamera(); }
+  });
+
+  btnCapture.addEventListener('click', async () => {
+    if(!usingWebcam) return;
+    await predict(webcam.canvas);
+  });
+
+  btnUpload.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    if(usingWebcam) stopCamera();
+    const url = URL.createObjectURL(file);
+    previewEl.src = url;
+    previewEl.style.display = 'block';
+    stageEmpty.style.display = 'none';
+    previewEl.onload = () => predict(previewEl);
+  });
+
+  btnLoadModel.addEventListener('click', () => {
+    loadModel(modelUrlInput.value.trim());
+  });
+
+  async function predict(source){
+    if(!model){
+      setStatus('Model belum dimuat. Tempel link Teachable Machine terlebih dahulu.');
+      return;
+    }
+    setStatus('Mengklasifikasikan…');
+    const prediction = await model.predict(source);
+
+    // urutkan dari probabilitas tertinggi
+    const sorted = [...prediction].sort((a,b) => b.probability - a.probability);
+    const rows = resultsEl.querySelectorAll('.result-row');
+
+    prediction.forEach((p, i) => {
+      const letter = extractGradeLetter(p.className) || String.fromCharCode(65+i);
+      if(rows[i]){
+        rows[i].querySelector('.result-label').textContent = p.className;
+        rows[i].querySelector('.bar-fill').style.width = (p.probability*100).toFixed(1) + '%';
+        rows[i].querySelector('.result-pct').textContent = (p.probability*100).toFixed(1) + '%';
+      }
+    });
+
+    const top = sorted[0];
+    const topLetter = extractGradeLetter(top.className);
+    const info = topLetter ? GRADE_INFO[topLetter] : null;
+
+    verdictEl.classList.add('show');
+    if(info){
+      verdictGrade.textContent = top.className + ' — ' + (top.probability*100).toFixed(1) + '% keyakinan';
+      verdictGrade.style.color = info.color;
+      verdictChar.textContent = info.char;
+      verdictRec.innerHTML = '<b>Rekomendasi:</b> ' + info.rec;
+    } else {
+      verdictGrade.textContent = top.className + ' — ' + (top.probability*100).toFixed(1) + '% keyakinan';
+      verdictChar.textContent = 'Nama kelas pada model tidak cocok dengan format Grade A–D.';
+      verdictRec.innerHTML = 'Beri nama kelas pada Teachable Machine sesuai format "Grade A", "Grade B", dst. agar rekomendasi tampil otomatis.';
+    }
+
+    setStatus('Klasifikasi selesai.');
+  }
+
+  // muat model default (kosong) saat halaman dibuka
+  loadModel(DEFAULT_MODEL_URL);
+})();
+</script>
+
+</body>
+</html>
